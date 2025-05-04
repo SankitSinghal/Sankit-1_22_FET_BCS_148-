@@ -1,0 +1,321 @@
+AverageCalculatorApplication.java
+
+package com.example.averagecalculator;
+
+import org.springframework.boot.SpringApplication;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+@SpringBootApplication
+public class AverageCalculatorApplication {
+    public static void main(String[] args) {
+        SpringApplication.run(AverageCalculatorApplication.class, args);
+    }
+}
+
+AverageResponse.java
+
+package com.example.averagecalculator.model;
+
+import java.util.List;
+
+public class AverageResponse {
+    private List<Double> windowPrevState;
+    private List<Double> windowCurrState;
+    private double avg;
+
+    public AverageResponse(List<Double> prev, List<Double> curr, double avg) {
+        this.windowPrevState = prev;
+        this.windowCurrState = curr;
+        this.avg = avg;
+    }
+
+    // Getters and setters
+}
+
+NumberStorage.java
+package com.example.averagecalculator.config;
+
+import org.springframework.stereotype.Component;
+
+import java.util.*;
+
+@Component
+public class NumberStorage {
+    private final int WINDOW_SIZE = 10;
+    private final Map<String, Deque<Double>> storage = new HashMap<>();
+
+    public NumberStorage() {
+        List<String> ids = List.of("p", "f", "e", "r");
+        for (String id : ids) {
+            storage.put(id, new ArrayDeque<>());
+        }
+    }
+
+    public List<Double> getNumbers(String id) {
+        return new ArrayList<>(storage.get(id));
+    }
+
+    public void addUniqueNumbers(String id, List<Double> newNums) {
+        Deque<Double> deque = storage.get(id);
+        Set<Double> existing = new HashSet<>(deque);
+
+        for (Double num : newNums) {
+            if (!existing.contains(num)) {
+                if (deque.size() == WINDOW_SIZE) {
+                    deque.pollFirst(); // Remove oldest
+                }
+                deque.addLast(num);
+                existing.add(num);
+            }
+        }
+    }
+
+    public double getAverage(String id) {
+        Deque<Double> deque = storage.get(id);
+        if (deque.isEmpty()) return 0.0;
+        return deque.stream().mapToDouble(d -> d).average().orElse(0.0);
+    }
+}
+
+AverageService.java
+
+package com.example.averagecalculator.service;
+
+import com.example.averagecalculator.config.NumberStorage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
+import java.util.*;
+
+@Service
+public class AverageService {
+
+    @Autowired
+    private NumberStorage numberStorage;
+
+    private final RestTemplate restTemplate;
+
+    public AverageService() {
+        this.restTemplate = new RestTemplate();
+        restTemplate.setRequestFactory(clientHttpRequestFactory());
+    }
+
+    private org.springframework.http.client.ClientHttpRequestFactory clientHttpRequestFactory() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(500);
+        factory.setReadTimeout(500);
+        return factory;
+    }
+
+    public List<Double> fetchNumbers(String id) {
+        try {
+            String url = "http://localhost:8000/testserver/numbers/" + id;
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            return ((List<?>) response.get("numbers")).stream()
+                    .map(num -> Double.parseDouble(num.toString()))
+                    .toList();
+        } catch (Exception e) {
+            return Collections.emptyList(); // on timeout or error
+        }
+    }
+
+    public List<Double> getOldState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public void updateStorage(String id, List<Double> newNums) {
+        numberStorage.addUniqueNumbers(id, newNums);
+    }
+
+    public List<Double> getCurrentState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public double getAverage(String id) {
+        return numberStorage.getAverage(id);
+    }
+}
+
+AverageController.java
+package com.example.averagecalculator.service;
+
+import com.example.averagecalculator.config.NumberStorage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
+import java.util.*;
+
+@Service
+public class AverageService {
+
+    @Autowired
+    private NumberStorage numberStorage;
+
+    private final RestTemplate restTemplate;
+
+    public AverageService() {
+        this.restTemplate = new RestTemplate();
+        restTemplate.setRequestFactory(clientHttpRequestFactory());
+    }
+
+    private org.springframework.http.client.ClientHttpRequestFactory clientHttpRequestFactory() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(500);
+        factory.setReadTimeout(500);
+        return factory;
+    }
+
+    public List<Double> fetchNumbers(String id) {
+        try {
+            String url = "http://localhost:8000/testserver/numbers/" + id;
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            return ((List<?>) response.get("numbers")).stream()
+                    .map(num -> Double.parseDouble(num.toString()))
+                    .toList();
+        } catch (Exception e) {
+            return Collections.emptyList(); // on timeout or error
+        }
+    }
+
+    public List<Double> getOldState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public void updateStorage(String id, List<Double> newNums) {
+        numberStorage.addUniqueNumbers(id, newNums);
+    }
+
+    public List<Double> getCurrentState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public double getAverage(String id) {
+        return numberStorage.getAverage(id);
+    }
+}
+ AverageService.java
+package com.example.averagecalculator.service;
+
+import com.example.averagecalculator.config.NumberStorage;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+
+import java.time.Duration;
+import java.util.*;
+
+@Service
+public class AverageService {
+
+    @Autowired
+    private NumberStorage numberStorage;
+
+    private final RestTemplate restTemplate;
+
+    public AverageService() {
+        this.restTemplate = new RestTemplate();
+        restTemplate.setRequestFactory(clientHttpRequestFactory());
+    }
+
+    private org.springframework.http.client.ClientHttpRequestFactory clientHttpRequestFactory() {
+        var factory = new org.springframework.http.client.SimpleClientHttpRequestFactory();
+        factory.setConnectTimeout(500);
+        factory.setReadTimeout(500);
+        return factory;
+    }
+
+    public List<Double> fetchNumbers(String id) {
+        try {
+            String url = "http://localhost:8000/testserver/numbers/" + id;
+            Map<String, Object> response = restTemplate.getForObject(url, Map.class);
+            return ((List<?>) response.get("numbers")).stream()
+                    .map(num -> Double.parseDouble(num.toString()))
+                    .toList();
+        } catch (Exception e) {
+            return Collections.emptyList(); // on timeout or error
+        }
+    }
+
+    public List<Double> getOldState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public void updateStorage(String id, List<Double> newNums) {
+        numberStorage.addUniqueNumbers(id, newNums);
+    }
+
+    public List<Double> getCurrentState(String id) {
+        return numberStorage.getNumbers(id);
+    }
+
+    public double getAverage(String id) {
+        return numberStorage.getAverage(id);
+    }
+}
+
+AverageController.java
+package com.example.averagecalculator.controller;
+
+import com.example.averagecalculator.model.AverageResponse;
+import com.example.averagecalculator.service.AverageService;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.Set;
+
+@RestController
+@RequestMapping("/numbers")
+public class AverageController {
+
+    private static final Set<String> VALID_IDS = Set.of("p", "f", "e", "r");
+
+    @Autowired
+    private AverageService averageService;
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getAverage(@PathVariable String id) {
+        if (!VALID_IDS.contains(id)) {
+            return ResponseEntity.badRequest().body("Invalid number ID");
+        }
+
+        List<Double> oldState = averageService.getOldState(id);
+        List<Double> newNumbers = averageService.fetchNumbers(id);
+        averageService.updateStorage(id, newNumbers);
+        List<Double> currState = averageService.getCurrentState(id);
+        double avg = averageService.getAverage(id);
+
+        return ResponseEntity.ok(new AverageResponse(oldState, currState, Math.round(avg * 100.0) / 100.0));
+    }
+}
+
+Output:
+
+  "windowPrevState": [2.0, 3.0, 5.0],
+  "windowCurrState": [2.0, 3.0, 5.0, 7.0, 11.0, 13.0],
+  "avg": 6.83
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
